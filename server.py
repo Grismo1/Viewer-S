@@ -130,7 +130,7 @@ async def main():
     print(" Puerto: 8765")
     print("===================================")
     
-    PORT = int(os.environ.get("PORT,8765"))
+    PORT = int(os.environ.get("PORT", 8765))
      
     async with websockets.serve(
         manejar_cliente,
