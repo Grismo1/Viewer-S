@@ -1,6 +1,7 @@
 import asyncio
 import websockets
 import json
+import os
 
 clientes = set()
 
@@ -128,9 +129,15 @@ async def main():
     print(" SERVIDOR REMOTEVIEW INICIADO ")
     print(" Puerto: 8765")
     print("===================================")
-
-
-    async with websockets.serve(manejar_cliente, "0.0.0.0", 8765):
+    
+    PORT = int(os.environ.get("PORT,8765"))
+     
+    async with websockets.serve(
+        manejar_cliente,
+        "0.0.0.0",
+        PORT
+        
+    ):
 
         await asyncio.Future()
 
