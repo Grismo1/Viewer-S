@@ -53,16 +53,27 @@ async def manejar_cliente(websocket):
 
             elif datos["type"] == "screen":
 
-                print(
-                    "Recibida captura:",
-                    len(datos["image"]),
-                    "bytes"
-                )
+    print(
+        "Recibida captura:",
+        len(datos["image"]),
+        "bytes"
+    )
 
-                mensaje = json.dumps({
-                    "type": "screen",
-                    "image": datos["image"]
-                })
+    mensaje = json.dumps({
+        "type": "screen",
+        "image": datos["image"]
+    })
+
+    for ws, info in list(dispositivos.items()):
+
+        if info["role"] == "viewer":
+
+            try:
+                await ws.send(mensaje)
+
+            except:
+
+                pass
 
 
                 for dispositivo, info in dispositivos.items():
