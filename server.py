@@ -4,7 +4,6 @@ import json
 import os
 
 clientes = set()
-
 dispositivos = {}
 
 
@@ -12,7 +11,7 @@ async def manejar_cliente(websocket):
 
     clientes.add(websocket)
 
-    print(f"[+] Cliente conectado")
+    print("[+] Cliente conectado")
     print(f"Conexiones activas: {len(clientes)}")
 
     try:
@@ -20,9 +19,10 @@ async def manejar_cliente(websocket):
         async for mensaje in websocket:
 
             datos = json.loads(mensaje)
+
             print("MENSAJE:")
             print(datos)
-            
+
             if datos["type"] == "register":
 
                 if datos["role"] == "client":
@@ -37,7 +37,6 @@ async def manejar_cliente(websocket):
                     print("Nombre:", datos["name"])
                     print("=============================")
 
-
                 elif datos["role"] == "viewer":
 
                     dispositivos[websocket] = {
@@ -49,40 +48,27 @@ async def manejar_cliente(websocket):
                     print("Viewer registrado")
                     print("=============================")
 
-
-
             elif datos["type"] == "screen":
 
-    print(
-        "Recibida captura:",
-        len(datos["image"]),
-        "bytes"
-    )
+                print(
+                    "Recibida captura:",
+                    len(datos["image"]),
+                    "bytes"
+                )
 
-    mensaje = json.dumps({
-        "type": "screen",
-        "image": datos["image"]
-    })
+                mensaje = json.dumps({
+                    "type": "screen",
+                    "image": datos["image"]
+                })
 
-    for ws, info in list(dispositivos.items()):
-
-        if info["role"] == "viewer":
-
-            try:
-                await ws.send(mensaje)
-
-            except:
-
-                pass
-
-
-                for dispositivo, info in dispositivos.items():
+                for ws, info in list(dispositivos.items()):
 
                     if info["role"] == "viewer":
 
-                        await dispositivo.send(mensaje)
-
-
+                        try:
+                            await ws.send(mensaje)
+                        except:
+                            pass
 
             elif datos["type"] == "ping":
 
@@ -92,11 +78,8 @@ async def manejar_cliente(websocket):
 
                     if info["role"] == "client":
                         print(f"PING <- {info['name']}")
-
                     else:
                         print("PING <- VIEWER")
-
-
 
             elif datos["type"] == "list_devices":
 
@@ -111,7 +94,6 @@ async def manejar_cliente(websocket):
                             "status": "online"
                         })
 
-
                 respuesta = {
                     "type": "device_list",
                     "devices": lista
@@ -119,10 +101,8 @@ async def manejar_cliente(websocket):
 
                 await websocket.send(json.dumps(respuesta))
 
-
     except websockets.ConnectionClosed:
         pass
-
 
     finally:
 
@@ -135,25 +115,21 @@ async def manejar_cliente(websocket):
         print(f"Conexiones activas: {len(clientes)}")
 
 
-
 async def main():
 
     print("===================================")
     print(" SERVIDOR REMOTEVIEW INICIADO ")
     print(" Puerto: 8765")
     print("===================================")
-    
+
     PORT = int(os.environ.get("PORT", 8765))
-     
+
     async with websockets.serve(
         manejar_cliente,
         "0.0.0.0",
         PORT
-        
     ):
-
         await asyncio.Future()
-
 
 
 asyncio.run(main())
