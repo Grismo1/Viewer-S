@@ -20,7 +20,9 @@ async def manejar_cliente(websocket):
         async for mensaje in websocket:
 
             datos = json.loads(mensaje)
-
+            print("MENSAJE:")
+            print(datos)
+            
             if datos["type"] == "register":
 
                 if datos["role"] == "client":
