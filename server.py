@@ -349,8 +349,12 @@ async def manejar_cliente(websocket):
             # ======================================================
 
 
-            elif tipo == "select_device":
+                        # ======================================================
+            # SELECCIONAR PC
+            # ======================================================
 
+
+            elif tipo == "select_device":
 
 
                 nombre = datos.get(
@@ -358,19 +362,15 @@ async def manejar_cliente(websocket):
                 )
 
 
-
                 info = dispositivos.get(
                     websocket
                 )
 
 
-
                 if info and info.get("role") == "viewer":
 
 
-
                     selecciones[websocket] = nombre
-
 
 
                     print(
@@ -384,7 +384,6 @@ async def manejar_cliente(websocket):
 
 
                     if nombre in camera_lists:
-
 
 
                         await enviar_json(
@@ -403,10 +402,46 @@ async def manejar_cliente(websocket):
 
 
 
+                    # ==============================
+                    # PRUEBA CONTROL REMOTO
+                    # ==============================
 
 
+                    for ws, info_pc in dispositivos.items():
 
 
+                        if (
+
+                            info_pc.get("role") == "client"
+
+                            and info_pc.get("name") == nombre
+
+                        ):
+
+
+                            await enviar_json(
+
+                                ws,
+
+                                {
+
+                                    "type":"mouse_move",
+
+                                    "x":500,
+
+                                    "y":300
+
+                                }
+
+                            )
+
+
+                            print(
+                                "Prueba mouse enviada"
+                            )
+
+
+                            break
             # ======================================================
             # CLIENTE ENVIA LISTA DE CAMARAS
             # ======================================================
