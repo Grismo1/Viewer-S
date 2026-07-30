@@ -6,9 +6,31 @@ import os
 
 clientes = set()
 
+# websocket -> datos del dispositivo
 dispositivos = {}
 
+# viewer websocket -> nombre PC seleccionada
 selecciones = {}
+
+# nombre PC -> lista de cámaras
+camera_lists = {}
+
+
+
+
+async def enviar_json(ws, datos):
+
+    try:
+
+        await ws.send(
+            json.dumps(datos)
+        )
+
+    except:
+
+        pass
+
+
 
 
 
@@ -19,7 +41,10 @@ async def manejar_cliente(websocket):
 
 
     print("[+] Cliente conectado")
-    print("Conexiones activas:", len(clientes))
+    print(
+        "Conexiones activas:",
+        len(clientes)
+    )
 
 
 
@@ -31,7 +56,7 @@ async def manejar_cliente(websocket):
 
 
             # ======================================================
-            # MENSAJES BINARIOS
+            # FRAMES BINARIOS
             # SCREEN / CAMERA
             # ======================================================
 
@@ -39,7 +64,9 @@ async def manejar_cliente(websocket):
             if isinstance(mensaje, bytes):
 
 
-                info_pc = dispositivos.get(websocket)
+                info_pc = dispositivos.get(
+                    websocket
+                )
 
 
 
@@ -60,23 +87,19 @@ async def manejar_cliente(websocket):
 
 
 
-                for viewer, pc_seleccionada in list(selecciones.items()):
+                for viewer, pc in list(selecciones.items()):
 
 
-
-                    if pc_seleccionada == nombre_pc:
-
+                    if pc == nombre_pc:
 
 
                         try:
 
-
-                            await viewer.send(mensaje)
-
-
+                            await viewer.send(
+                                mensaje
+                            )
 
                         except:
-
 
                             pass
 
@@ -91,46 +114,58 @@ async def manejar_cliente(websocket):
 
 
             # ======================================================
-            # MENSAJES JSON
+            # JSON
             # ======================================================
 
 
 
             try:
 
-
-                datos = json.loads(mensaje)
-
+                datos = json.loads(
+                    mensaje
+                )
 
 
             except:
 
 
-                print("Mensaje JSON inválido")
+                print(
+                    "JSON inválido"
+                )
 
                 continue
 
 
 
 
-            print("MENSAJE:")
+            print(
+                "MENSAJE:",
+                datos
+            )
 
-            print(datos)
 
 
+
+            tipo = datos.get(
+                "type"
+            )
 
 
 
 
 
             # ======================================================
-            # REGISTRO
+            # REGISTER
             # ======================================================
 
 
+            if tipo == "register":
 
-            if datos["type"] == "register":
 
+
+                role = datos.get(
+                    "role"
+                )
 
 
 
@@ -139,12 +174,13 @@ async def manejar_cliente(websocket):
                 # -------------------------
 
 
-                if datos["role"] == "client":
+                if role == "client":
 
 
-
-                    nombre = datos["name"]
-
+                    nombre = datos.get(
+                        "name",
+                        "PC"
+                    )
 
 
 
@@ -152,7 +188,6 @@ async def manejar_cliente(websocket):
 
 
                     for ws, info in list(dispositivos.items()):
-
 
 
                         if (
@@ -166,18 +201,15 @@ async def manejar_cliente(websocket):
                         ):
 
 
-
                             print(
                                 "Cliente duplicado:",
                                 nombre
                             )
 
 
-
                             try:
 
                                 await ws.close()
-
 
                             except:
 
@@ -185,9 +217,10 @@ async def manejar_cliente(websocket):
 
 
 
-                            dispositivos.pop(ws, None)
-
-
+                            dispositivos.pop(
+                                ws,
+                                None
+                            )
 
 
 
@@ -196,9 +229,9 @@ async def manejar_cliente(websocket):
                     dispositivos[websocket] = {
 
 
-                        "role": "client",
+                        "role":"client",
 
-                        "name": nombre
+                        "name":nombre
 
 
                     }
@@ -207,14 +240,15 @@ async def manejar_cliente(websocket):
 
 
                     print()
-
-                    print("========== CLIENTE ==========")
-
-                    print("Nombre:", nombre)
-
-                    print("=============================")
-
-
+                    print(
+                        "========== CLIENTE =========="
+                    )
+                    print(
+                        nombre
+                    )
+                    print(
+                        "============================="
+                    )
 
 
 
@@ -225,72 +259,30 @@ async def manejar_cliente(websocket):
                 # -------------------------
 
 
-
-                elif datos["role"] == "viewer":
+                elif role == "viewer":
 
 
 
                     dispositivos[websocket] = {
 
 
-                        "role": "viewer"
+                        "role":"viewer"
 
 
                     }
 
 
 
-
                     print()
-
-                    print("========== VIEWER ==========")
-
-                    print("Viewer registrado")
-
-                    print("=============================")
-
-
-
-
-
-
-
-
-
-            # ======================================================
-            # SELECCIONAR PC
-            # ======================================================
-
-
-
-            elif datos["type"] == "select_device":
-
-
-
-
-                nombre = datos["name"]
-
-
-
-                info = dispositivos.get(websocket)
-
-
-
-
-                if info and info["role"] == "viewer":
-
-
-
-                    selecciones[websocket] = nombre
-
-
-
-
                     print(
-                        "Viewer seleccionó:",
-                        nombre
+                        "========== VIEWER =========="
                     )
-
+                    print(
+                        "Viewer conectado"
+                    )
+                    print(
+                        "============================="
+                    )
 
 
 
@@ -304,9 +296,7 @@ async def manejar_cliente(websocket):
             # ======================================================
 
 
-
-            elif datos["type"] == "list_devices":
-
+            elif tipo == "list_devices":
 
 
 
@@ -314,23 +304,19 @@ async def manejar_cliente(websocket):
 
 
 
-
-                for dispositivo in dispositivos.values():
-
+                for info in dispositivos.values():
 
 
-                    if dispositivo["role"] == "client":
+
+                    if info.get("role") == "client":
 
 
 
                         lista.append({
 
+                            "name":info["name"],
 
-                            "name": dispositivo["name"],
-
-
-                            "status": "online"
-
+                            "status":"online"
 
                         })
 
@@ -338,17 +324,222 @@ async def manejar_cliente(websocket):
 
 
 
+                await enviar_json(
 
-                await websocket.send(json.dumps({
+                    websocket,
+
+                    {
+
+                        "type":"device_list",
+
+                        "devices":lista
+
+                    }
+
+                )
 
 
-                    "type": "device_list",
 
 
-                    "devices": lista
 
 
-                }))
+
+            # ======================================================
+            # SELECCIONAR PC
+            # ======================================================
+
+
+            elif tipo == "select_device":
+
+
+
+                nombre = datos.get(
+                    "name"
+                )
+
+
+
+                info = dispositivos.get(
+                    websocket
+                )
+
+
+
+                if info and info.get("role") == "viewer":
+
+
+
+                    selecciones[websocket] = nombre
+
+
+
+                    print(
+                        "Viewer seleccionó:",
+                        nombre
+                    )
+
+
+
+                    # enviar cámaras disponibles si existen
+
+
+                    if nombre in camera_lists:
+
+
+
+                        await enviar_json(
+
+                            websocket,
+
+                            {
+
+                                "type":"camera_list",
+
+                                "cameras":camera_lists[nombre]
+
+                            }
+
+                        )
+
+
+
+
+
+
+
+            # ======================================================
+            # CLIENTE ENVIA LISTA DE CAMARAS
+            # ======================================================
+
+
+            elif tipo == "camera_list":
+
+
+
+                nombre = datos.get(
+                    "device"
+                )
+
+
+                cams = datos.get(
+                    "cameras",
+                    []
+                )
+
+
+
+                camera_lists[nombre] = cams
+
+
+
+                print(
+                    "Cámaras de",
+                    nombre,
+                    ":",
+                    cams
+                )
+
+
+
+
+                # avisar al viewer que esté mirando esa PC
+
+
+                for viewer, pc in list(selecciones.items()):
+
+
+
+                    if pc == nombre:
+
+
+
+                        await enviar_json(
+
+                            viewer,
+
+                            {
+
+                                "type":"camera_list",
+
+                                "cameras":cams
+
+                            }
+
+                        )
+
+
+
+
+
+
+
+            # ======================================================
+            # CAMBIAR CAMARA
+            # ======================================================
+
+
+            elif tipo == "set_camera":
+
+
+
+                pc = selecciones.get(
+                    websocket
+                )
+
+
+
+                if not pc:
+
+                    continue
+
+
+
+
+                nueva = datos.get(
+                    "camera"
+                )
+
+
+
+                for ws, info in dispositivos.items():
+
+
+
+                    if (
+
+                        info.get("role") == "client"
+
+                        and info.get("name") == pc
+
+                    ):
+
+
+
+                        await enviar_json(
+
+                            ws,
+
+                            {
+
+                                "type":"set_camera",
+
+                                "camera":nueva
+
+                            }
+
+                        )
+
+
+
+                        print(
+                            "Cambio cámara",
+                            pc,
+                            nueva
+                        )
+
+
+
+                        break
 
 
 
@@ -361,38 +552,21 @@ async def manejar_cliente(websocket):
             # ======================================================
 
 
-
-            elif datos["type"] == "ping":
-
+            elif tipo == "ping":
 
 
-
-                info = dispositivos.get(websocket)
-
-
+                info = dispositivos.get(
+                    websocket
+                )
 
 
                 if info:
 
 
-
-                    if info["role"] == "client":
-
-
-                        print(
-                            "PING <-",
-                            info["name"]
-                        )
-
-
-
-                    else:
-
-
-                        print(
-                            "PING <- VIEWER"
-                        )
-
+                    print(
+                        "PING <-",
+                        info.get("name","VIEWER")
+                    )
 
 
 
@@ -401,17 +575,17 @@ async def manejar_cliente(websocket):
 
     except websockets.ConnectionClosed:
 
-
         pass
-
 
 
 
     except Exception as e:
 
 
-        print("Error:", e)
-
+        print(
+            "Error:",
+            e
+        )
 
 
 
@@ -420,18 +594,45 @@ async def manejar_cliente(websocket):
 
 
 
-        dispositivos.pop(websocket, None)
-
-
-        selecciones.pop(websocket, None)
-
-
-        clientes.discard(websocket)
+        info = dispositivos.pop(
+            websocket,
+            None
+        )
 
 
 
-        print("[-] Cliente desconectado")
+        selecciones.pop(
+            websocket,
+            None
+        )
 
+
+
+        clientes.discard(
+            websocket
+        )
+
+
+
+        if info:
+
+            nombre = info.get(
+                "name"
+            )
+
+
+            if nombre:
+
+                camera_lists.pop(
+                    nombre,
+                    None
+                )
+
+
+
+        print(
+            "[-] Cliente desconectado"
+        )
 
         print(
             "Conexiones activas:",
@@ -447,38 +648,31 @@ async def manejar_cliente(websocket):
 async def main():
 
 
+    PORT = int(
+        os.environ.get(
+            "PORT",
+            8765
+        )
+    )
 
-    print("===================================")
 
-    print(" SERVIDOR REMOTEVIEW INICIADO ")
+
+    print(
+        "==================================="
+    )
+
+    print(
+        " SERVIDOR REMOTEVIEW INICIADO "
+    )
 
     print(
         " Puerto:",
-        os.environ.get(
-            "PORT",
-            8765
-        )
+        PORT
     )
 
-    print("===================================")
-
-
-
-
-
-    PORT = int(
-
-        os.environ.get(
-
-            "PORT",
-
-            8765
-
-        )
-
+    print(
+        "==================================="
     )
-
-
 
 
 
@@ -486,26 +680,18 @@ async def main():
 
     async with websockets.serve(
 
-
         manejar_cliente,
-
 
         "0.0.0.0",
 
-
         PORT,
 
-
         max_size=None
-
 
     ):
 
 
-
         await asyncio.Future()
-
-
 
 
 
