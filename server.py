@@ -14,20 +14,27 @@ selecciones = {}
 
 async def manejar_cliente(websocket):
 
+
     clientes.add(websocket)
+
 
     print("[+] Cliente conectado")
     print("Conexiones activas:", len(clientes))
 
 
+
     try:
+
 
         async for mensaje in websocket:
 
 
+
             # ======================================================
-            # MENSAJES BINARIOS (PANTALLA)
+            # MENSAJES BINARIOS
+            # SCREEN / CAMERA
             # ======================================================
+
 
             if isinstance(mensaje, bytes):
 
@@ -35,26 +42,41 @@ async def manejar_cliente(websocket):
                 info_pc = dispositivos.get(websocket)
 
 
+
                 if not info_pc:
+
                     continue
+
+
+
+                if info_pc.get("role") != "client":
+
+                    continue
+
 
 
                 nombre_pc = info_pc["name"]
 
 
 
+
                 for viewer, pc_seleccionada in list(selecciones.items()):
+
 
 
                     if pc_seleccionada == nombre_pc:
 
 
+
                         try:
+
 
                             await viewer.send(mensaje)
 
 
+
                         except:
+
 
                             pass
 
@@ -65,14 +87,20 @@ async def manejar_cliente(websocket):
 
 
 
+
+
+
             # ======================================================
             # MENSAJES JSON
             # ======================================================
 
 
+
             try:
 
+
                 datos = json.loads(mensaje)
+
 
 
             except:
@@ -84,8 +112,13 @@ async def manejar_cliente(websocket):
 
 
 
+
             print("MENSAJE:")
+
             print(datos)
+
+
+
 
 
 
@@ -95,36 +128,50 @@ async def manejar_cliente(websocket):
             # ======================================================
 
 
+
             if datos["type"] == "register":
 
 
 
+
+                # -------------------------
+                # CLIENTE PC
+                # -------------------------
+
+
                 if datos["role"] == "client":
+
 
 
                     nombre = datos["name"]
 
 
 
-                    # ==========================================
-                    # EVITAR CLIENTES DUPLICADOS
-                    # ==========================================
+
+                    # eliminar duplicados
 
 
                     for ws, info in list(dispositivos.items()):
 
 
+
                         if (
+
                             info.get("role") == "client"
+
                             and info.get("name") == nombre
+
                             and ws != websocket
+
                         ):
 
 
+
                             print(
-                                "Cliente duplicado encontrado:",
+                                "Cliente duplicado:",
                                 nombre
                             )
+
 
 
                             try:
@@ -143,20 +190,39 @@ async def manejar_cliente(websocket):
 
 
 
+
+
+
                     dispositivos[websocket] = {
+
 
                         "role": "client",
 
                         "name": nombre
 
+
                     }
 
 
 
+
                     print()
+
                     print("========== CLIENTE ==========")
+
                     print("Nombre:", nombre)
+
                     print("=============================")
+
+
+
+
+
+
+
+                # -------------------------
+                # VIEWER
+                # -------------------------
 
 
 
@@ -167,27 +233,38 @@ async def manejar_cliente(websocket):
                     dispositivos[websocket] = {
 
 
-                        "role":"viewer"
+                        "role": "viewer"
 
 
                     }
 
 
 
+
                     print()
+
                     print("========== VIEWER ==========")
+
                     print("Viewer registrado")
+
                     print("=============================")
 
 
 
 
+
+
+
+
+
             # ======================================================
-            # VIEWER SELECCIONA PC
+            # SELECCIONAR PC
             # ======================================================
+
 
 
             elif datos["type"] == "select_device":
+
 
 
 
@@ -199,11 +276,13 @@ async def manejar_cliente(websocket):
 
 
 
+
                 if info and info["role"] == "viewer":
 
 
 
                     selecciones[websocket] = nombre
+
 
 
 
@@ -217,16 +296,22 @@ async def manejar_cliente(websocket):
 
 
 
+
+
+
             # ======================================================
-            # LISTA DE PCS
+            # LISTAR PCS
             # ======================================================
+
 
 
             elif datos["type"] == "list_devices":
 
 
 
+
                 lista = []
+
 
 
 
@@ -243,7 +328,8 @@ async def manejar_cliente(websocket):
 
                             "name": dispositivo["name"],
 
-                            "status":"online"
+
+                            "status": "online"
 
 
                         })
@@ -252,15 +338,18 @@ async def manejar_cliente(websocket):
 
 
 
+
                 await websocket.send(json.dumps({
 
 
-                    "type":"device_list",
+                    "type": "device_list",
 
-                    "devices":lista
+
+                    "devices": lista
 
 
                 }))
+
 
 
 
@@ -272,11 +361,14 @@ async def manejar_cliente(websocket):
             # ======================================================
 
 
+
             elif datos["type"] == "ping":
 
 
 
+
                 info = dispositivos.get(websocket)
+
 
 
 
@@ -293,12 +385,15 @@ async def manejar_cliente(websocket):
                         )
 
 
+
                     else:
 
 
                         print(
                             "PING <- VIEWER"
                         )
+
+
 
 
 
@@ -311,10 +406,12 @@ async def manejar_cliente(websocket):
 
 
 
+
     except Exception as e:
 
 
         print("Error:", e)
+
 
 
 
@@ -335,6 +432,7 @@ async def manejar_cliente(websocket):
 
         print("[-] Cliente desconectado")
 
+
         print(
             "Conexiones activas:",
             len(clientes)
@@ -344,7 +442,10 @@ async def manejar_cliente(websocket):
 
 
 
+
+
 async def main():
+
 
 
     print("===================================")
@@ -353,7 +454,10 @@ async def main():
 
     print(
         " Puerto:",
-        os.environ.get("PORT",8765)
+        os.environ.get(
+            "PORT",
+            8765
+        )
     )
 
     print("===================================")
@@ -361,30 +465,46 @@ async def main():
 
 
 
+
     PORT = int(
+
         os.environ.get(
+
             "PORT",
+
             8765
+
         )
+
     )
+
+
+
 
 
 
 
     async with websockets.serve(
 
+
         manejar_cliente,
+
 
         "0.0.0.0",
 
+
         PORT,
 
+
         max_size=None
+
 
     ):
 
 
+
         await asyncio.Future()
+
 
 
 
