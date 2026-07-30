@@ -540,7 +540,113 @@ async def manejar_cliente(websocket):
 
 
                         break
+                        # ======================================================
+            # CONTROL REMOTO
+            # MOUSE / TECLADO
+            # ======================================================
 
+
+            elif tipo in [
+
+                "mouse_move",
+
+                "mouse_click",
+
+                "mouse_scroll",
+
+                "key_press"
+
+            ]:
+
+
+
+                info_viewer = dispositivos.get(
+                    websocket
+                )
+
+
+
+                if not info_viewer:
+
+                    continue
+
+
+
+                if info_viewer.get("role") != "viewer":
+
+                    continue
+
+
+
+
+                pc = selecciones.get(
+                    websocket
+                )
+
+
+
+                if not pc:
+
+
+                    print(
+                        "Viewer sin PC seleccionada"
+                    )
+
+
+                    continue
+
+
+
+
+
+
+                for ws, info_pc in dispositivos.items():
+
+
+
+                    if (
+
+                        info_pc.get("role") == "client"
+
+                        and info_pc.get("name") == pc
+
+                    ):
+
+
+
+                        try:
+
+
+
+                            await ws.send(
+
+                                json.dumps(
+                                    datos
+                                )
+
+                            )
+
+
+
+                            print(
+                                "Comando remoto enviado:",
+                                datos
+                            )
+
+
+
+                        except Exception as e:
+
+
+
+                            print(
+                                "Error enviando comando:",
+                                e
+                            )
+
+
+
+                        break        
 
 
 
