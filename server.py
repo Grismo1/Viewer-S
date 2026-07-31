@@ -49,6 +49,8 @@ async def enviar_a_pc(nombre, mensaje):
 
 async def manejar_cliente(websocket):
 
+    print("[+] NUEVA CONEXION")
+
     print("[+] Cliente conectado")
 
     try:
@@ -122,6 +124,7 @@ async def manejar_cliente(websocket):
             # ==================================================
 
             if tipo == "register":
+                print("REGISTER RECIBIDO:", datos)
 
                 role = datos.get("role")
 
@@ -155,6 +158,9 @@ async def manejar_cliente(websocket):
                         "screen_width": datos.get("screen_width", 1920),
                         "screen_height": datos.get("screen_height", 1080),
                     }
+                    print("DISPOSITIVOS ACTUALES:")
+                    for d in dispositivos.values():
+                        print(d)
 
                     print("CLIENTE:", nombre)
 
@@ -196,14 +202,7 @@ async def manejar_cliente(websocket):
 
                     if anterior and anterior != nombre:
 
-                        await enviar_a_pc(
-                            anterior,
-                            json.dumps(
-                                {
-                                    "type": "stream_stop"
-                                }
-                            )
-                        )
+                        await enviar_a_pc(anterior, json.dumps({"type": "stream_stop"}))
 
                     selecciones[websocket] = nombre
 
@@ -311,10 +310,7 @@ async def manejar_cliente(websocket):
     pc_seleccionada = selecciones.pop(websocket, None)
 
     if pc_seleccionada:
-        await enviar_a_pc(
-            pc_seleccionada,
-            json.dumps({"type": "stream_stop"})
-        )
+        await enviar_a_pc(pc_seleccionada, json.dumps({"type": "stream_stop"}))
 
     info = dispositivos.pop(websocket, None)
 
