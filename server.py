@@ -2,7 +2,7 @@ import asyncio
 import websockets
 import json
 import os
-
+import time
 
 
 # websocket -> información del dispositivo
@@ -15,7 +15,8 @@ selecciones = {}
 
 # nombre PC -> cámaras
 camera_lists = {}
-
+frames_actuales = {}
+ultimo_envio_frame = {}
 
 
 
@@ -87,19 +88,15 @@ async def manejar_cliente(websocket):
 
 
 
-            # ==================================================
+                        # ==================================================
             # FRAMES BINARIOS
             # ==================================================
 
-
             if isinstance(mensaje, bytes):
-
-
 
                 info = dispositivos.get(
                     websocket
                 )
-
 
 
                 if not info:
@@ -107,11 +104,9 @@ async def manejar_cliente(websocket):
                     continue
 
 
-
                 if info.get("role") != "client":
 
                     continue
-
 
 
                 nombre = info.get(
@@ -119,42 +114,23 @@ async def manejar_cliente(websocket):
                 )
 
 
-
-
-                for viewer, pc in list(
-                    selecciones.items()
-                ):
-
-
+                for viewer, pc in list(selecciones.items()):
 
                     if pc == nombre:
 
-
                         try:
 
-
-                            await viewer.send(
-                                mensaje
+                            asyncio.create_task(
+                                viewer.send(mensaje)
                             )
 
 
-                        except:
-
+                        except Exception:
 
                             pass
 
 
-
-
-                continue
-
-
-
-
-
-
-
-            # ==================================================
+                continue            # ==================================================
             # JSON
             # ==================================================
 
@@ -693,91 +669,76 @@ async def manejar_cliente(websocket):
                 if tipo == "mouse_move":
 
 
-
                     info_pc = None
-
-
 
 
                     for ws, info in dispositivos.items():
 
 
-
                         if (
-
-                            info.get("role") == "client"
-
-                            and info.get("name") == pc
-
+                             info.get("role") == "client"
+                             and info.get("name") == pc
                         ):
 
+                             info_pc = info
 
-                            info_pc = info
-
-                            break
-
-
-
+                             break
 
 
 
                     if info_pc:
 
 
-
-                        ancho_pc = info_pc.get(
-
+                             ancho_pc = info_pc.get(
                             "screen_width",
-
-                            1920
-
-                        )
+                              1920
+                         )
 
 
-
-                        alto_pc = info_pc.get(
-
-                            "screen_height",
-
-                            1080
-
-                        )
+                             alto_pc = info_pc.get(
+                             "screen_height",
+                              1080
+                         )
 
 
+                             x_rel = datos.get(
+                              "x",
+                               0
+                          )
 
 
-                        x_rel = datos.get(
-                            "x",
-                            0
-                        )
+                             y_rel = datos.get(
+            "y",
+            0
+        )
 
 
-
-                        y_rel = datos.get(
-                            "y",
-                            0
-                        )
-
+        ancho_viewer = datos.get(
+            "viewer_width",
+            1
+        )
 
 
-
-                        comando["x"] = int(
-
-                            x_rel *
-
-                            ancho_pc
-
-                        )
+        alto_viewer = datos.get(
+            "viewer_height",
+            1
+        )
 
 
+        comando["x"] = int(
+            x_rel *
+            ancho_pc
+            /
+            ancho_viewer
+        )
 
-                        comando["y"] = int(
 
-                            y_rel *
-
-                            alto_pc
-
-                        )
+        comando["y"] = int(
+            y_rel *
+            alto_pc
+            /
+            alto_viewer
+        )
 
 
 
@@ -785,7 +746,7 @@ async def manejar_cliente(websocket):
 
 
 
-                await enviar_a_pc(
+        await enviar_a_pc(
 
 
 
