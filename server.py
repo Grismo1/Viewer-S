@@ -10,7 +10,8 @@ dispositivos = {}
 
 # viewer websocket -> PC seleccionada
 selecciones = {}
-
+streams_activos = {}
+streams_viewer = {}
 
 # nombre PC -> cámaras
 camera_lists = {}
@@ -72,17 +73,35 @@ async def manejar_cliente(websocket):
 
                 nombre = info.get("name")
 
+                viewers_muertos = []
+
                 for viewer, pc in list(selecciones.items()):
 
-                    if pc == nombre:
+                    if pc != nombre:
 
-                        try:
+                        continue
 
-                            asyncio.create_task(viewer.send(mensaje))
+                    try:
 
-                        except Exception:
+                        await viewer.send(mensaje)
 
-                            pass
+                    except Exception:
+
+                        viewers_muertos.append(viewer)
+
+                for viewer in viewers_muertos:
+
+                    selecciones.pop(viewer, None)
+
+                    dispositivos.pop(viewer, None)
+
+                    try:
+
+                        await viewer.close()
+
+                    except:
+
+                        pass
 
                 continue  # ==================================================
             # JSON
@@ -173,9 +192,24 @@ async def manejar_cliente(websocket):
 
                 if info and info.get("role") == "viewer":
 
+                    anterior = selecciones.get(websocket)
+
+                    if anterior and anterior != nombre:
+
+                        await enviar_a_pc(
+                            anterior,
+                            json.dumps(
+                                {
+                                    "type": "stream_stop"
+                                }
+                            )
+                        )
+
                     selecciones[websocket] = nombre
 
                     print("PC seleccionada:", nombre)
+
+                    await enviar_a_pc(nombre, json.dumps({"type": "stream_start"}))
 
                     if nombre in camera_lists:
 
@@ -221,85 +255,76 @@ async def manejar_cliente(websocket):
             # CONTROL REMOTO
             # ==================================================
 
-            elif tipo in ["mouse_move", "mouse_click", "mouse_scroll", "key_press"]:
-
+            elif tipo in (
+                "mouse_move",
+                "mouse_click",
+                "mouse_double_click",
+                "mouse_scroll",
+                "key_press",
+            ):
                 info_viewer = dispositivos.get(websocket)
 
                 if not info_viewer:
-
                     continue
 
                 if info_viewer.get("role") != "viewer":
-
                     continue
 
                 pc = selecciones.get(websocket)
 
                 if not pc:
-
                     continue
 
                 comando = datos.copy()
 
-                # ==============================
-                # MOUSE RELATIVO
-                # ==============================
-
                 if tipo == "mouse_move":
-
                     info_pc = None
 
                     for ws, info in dispositivos.items():
-
                         if info.get("role") == "client" and info.get("name") == pc:
-
                             info_pc = info
-
                             break
 
                     if info_pc:
-
                         ancho_pc = info_pc.get("screen_width", 1920)
-
                         alto_pc = info_pc.get("screen_height", 1080)
 
-                        x_rel = datos.get("x", 0)
+                        try:
+                            x_rel = float(datos.get("x", 0))
+                            y_rel = float(datos.get("y", 0))
+                        except (TypeError, ValueError):
+                            continue
 
-                        y_rel = datos.get("y", 0)
+                        x_rel = max(0.0, min(1.0, x_rel))
+                        y_rel = max(0.0, min(1.0, y_rel))
+                        comando["x"] = int(x_rel * ancho_pc)
+                        comando["y"] = int(y_rel * alto_pc)
 
-        ancho_viewer = datos.get("viewer_width", 1)
-
-        alto_viewer = datos.get("viewer_height", 1)
-
-        comando["x"] = int(x_rel * ancho_pc / ancho_viewer)
-
-        comando["y"] = int(y_rel * alto_pc / alto_viewer)
-
-        await enviar_a_pc(pc, json.dumps(comando))
+                await enviar_a_pc(pc, json.dumps(comando))
 
     except websockets.ConnectionClosed:
-
         pass
 
-    except Exception as e:
+    except Exception as error:
+        print(f"[!] Error con el cliente: {error}")
 
-        print("Error:", e)
+    pc_seleccionada = selecciones.pop(websocket, None)
 
-    finally:
+    if pc_seleccionada:
+        await enviar_a_pc(
+            pc_seleccionada,
+            json.dumps({"type": "stream_stop"})
+        )
 
-        info = dispositivos.pop(websocket, None)
+    info = dispositivos.pop(websocket, None)
 
-        selecciones.pop(websocket, None)
+    if info:
+        nombre = info.get("name")
 
-        if info:
+        if nombre:
+            camera_lists.pop(nombre, None)
 
-            nombre = info.get("name")
-
-            if nombre:
-
-                camera_lists.pop(nombre, None)
-
-        print("[-] Desconectado")
+    print("[-] Desconectado")
 
 
 async def main():
