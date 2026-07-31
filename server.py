@@ -179,16 +179,33 @@ async def manejar_cliente(websocket):
             # ==================================================
 
             elif tipo == "list_devices":
-                print("viewer pido lista de dispositivos")
+
+                print("LIST_DEVICES PEDIDO")
+
+                info = dispositivos.get(websocket)
+
+                print("INFO DEL QUE PIDE:", info)
 
                 lista = []
 
-                for info in dispositivos.values():
-                    if info.get("role") == "client":
-                        lista.append({"name": info["name"], "status": "online"})
-                print("lista de dispositivos:", lista)
+                for ws, dispositivo in dispositivos.items():
 
-                await enviar_json(websocket, {"type": "device_list", "devices": lista})
+                    if dispositivo.get("role") == "client":
+
+                        lista.append({
+                            "name": dispositivo["name"],
+                            "status": "online"
+                        })
+
+                print("ENVIANDO LISTA:", lista)
+
+                await enviar_json(
+                    websocket,
+                    {
+                        "type": "device_list",
+                        "devices": lista
+                    }
+                )
 
             # ==================================================
             # SELECCIONAR PC
