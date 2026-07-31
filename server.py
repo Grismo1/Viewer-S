@@ -1,3 +1,4 @@
+print("========== SERVER.PY NUEVO VERSION ==========")
 import asyncio
 import websockets
 import json
@@ -333,5 +334,5 @@ async def main():
 
         await asyncio.Future()
 
-
+print("========== ANTES DE ARRANCAR WEBSOCKET ==========")
 asyncio.run(main())
