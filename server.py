@@ -1,9 +1,12 @@
-print("========== SERVER.PY NUEVO VERSION ==========")
 import asyncio
 import websockets
 import json
 import os
 import time
+import functools
+
+print = functools.partial(print, flush=True)
+print("SERVER.PY CARGADO")
 
 # websocket -> información del dispositivo
 dispositivos = {}
