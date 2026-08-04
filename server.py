@@ -2,8 +2,8 @@ import asyncio
 import websockets
 import json
 import os
-import time
 import functools
+
 
 print = functools.partial(print, flush=True)
 
@@ -24,18 +24,8 @@ dispositivos = {}
 selecciones = {}
 
 
-# estados streaming
-streams_activos = {}
-streams_viewer = {}
-
-
 # nombre PC -> cámaras
 camera_lists = {}
-
-
-# buffers futuros
-frames_actuales = {}
-ultimo_envio_frame = {}
 
 
 # ======================================================
@@ -54,11 +44,15 @@ async def enviar_json(ws, datos):
         pass
 
 
+
 async def enviar_a_pc(nombre, mensaje):
 
     for ws, info in list(dispositivos.items()):
 
-        if info.get("role") == "client" and info.get("name") == nombre:
+        if (
+            info.get("role") == "client"
+            and info.get("name") == nombre
+        ):
 
             try:
 
@@ -71,6 +65,7 @@ async def enviar_a_pc(nombre, mensaje):
             return
 
 
+
 async def enviar_a_viewer_de_pc(nombre, mensaje):
 
     muertos = []
@@ -78,6 +73,7 @@ async def enviar_a_viewer_de_pc(nombre, mensaje):
     for viewer, pc in list(selecciones.items()):
 
         if pc != nombre:
+
             continue
 
         try:
@@ -88,9 +84,11 @@ async def enviar_a_viewer_de_pc(nombre, mensaje):
 
             muertos.append(viewer)
 
+
     for viewer in muertos:
 
         selecciones.pop(viewer, None)
+
         dispositivos.pop(viewer, None)
 
         try:
@@ -102,6 +100,42 @@ async def enviar_a_viewer_de_pc(nombre, mensaje):
             pass
 
 
+
+# ======================================================
+# NUEVO FIX
+# ENVIAR RESPUESTA AL VIEWER CORRECTO
+# ======================================================
+
+
+async def enviar_a_viewer(websocket_viewer, mensaje):
+
+    try:
+
+        await websocket_viewer.send(mensaje)
+
+    except Exception:
+
+        pass
+
+
+
+# ======================================================
+# BUSCAR VIEWER QUE CONTROLA UNA PC
+# ======================================================
+
+
+def obtener_viewer_de_pc(nombre_pc):
+
+    for viewer, pc in list(selecciones.items()):
+
+        if pc == nombre_pc:
+
+            return viewer
+
+    return None
+
+
+
 # ======================================================
 # MANEJAR CLIENTES
 # ======================================================
@@ -111,9 +145,11 @@ async def manejar_cliente(websocket):
 
     print("[+] NUEVA CONEXION")
 
+
     try:
 
         async for mensaje in websocket:
+
 
             # ==================================================
             # BINARIOS
@@ -121,82 +157,131 @@ async def manejar_cliente(websocket):
 
             if isinstance(mensaje, bytes):
 
+
                 info = dispositivos.get(websocket)
+
 
                 if not info:
 
                     continue
 
+
+
                 if info.get("role") != "client":
 
                     continue
 
+
+
                 nombre = info.get("name")
 
-                # identificar tipo de binario
+
 
                 prefijo = mensaje[:6]
 
-                # pantalla
+
 
                 if prefijo == b"SCREEN":
 
-                    await enviar_a_viewer_de_pc(nombre, mensaje)
+                    await enviar_a_viewer_de_pc(
+                        nombre,
+                        mensaje
+                    )
 
-                # cámara
+
 
                 elif prefijo == b"CAMERA":
 
-                    await enviar_a_viewer_de_pc(nombre, mensaje)
+                    await enviar_a_viewer_de_pc(
+                        nombre,
+                        mensaje
+                    )
 
-                # archivos futuros
 
-                elif prefijo.startswith(b"FILE"):
 
-                    await enviar_a_viewer_de_pc(nombre, mensaje)
+                # descarga de archivos
+                                # descarga de archivos binarios
+
+                elif prefijo == b"FILE_D":
+
+
+                    viewer = obtener_viewer_de_pc(
+                        nombre
+                    )
+
+
+                    if viewer:
+
+                        await enviar_a_viewer(
+                            viewer,
+                            mensaje
+                        )
+
 
                 continue
-                # ==================================================
+                        # ==================================================
             # JSON
             # ==================================================
+
 
             try:
 
                 datos = json.loads(mensaje)
 
+
             except Exception:
 
                 continue
 
+
+
             tipo = datos.get("type")
+
+
 
             # ==================================================
             # REGISTER
             # ==================================================
 
+
             if tipo == "register":
+
 
                 print("REGISTER RECIBIDO:", datos)
 
+
+
                 role = datos.get("role")
+
+
 
                 # ------------------------------
                 # CLIENTE REMOTO
                 # ------------------------------
 
+
                 if role == "client":
 
-                    nombre = datos.get("name", "PC")
 
-                    # eliminar duplicado
+                    nombre = datos.get(
+                        "name",
+                        "PC"
+                    )
+
+
+
+                    # eliminar duplicados
+
 
                     for ws, info in list(dispositivos.items()):
+
 
                         if (
                             info.get("role") == "client"
                             and info.get("name") == nombre
                             and ws != websocket
                         ):
+
 
                             try:
 
@@ -206,270 +291,849 @@ async def manejar_cliente(websocket):
 
                                 pass
 
-                            dispositivos.pop(ws, None)
+
+
+                            dispositivos.pop(
+                                ws,
+                                None
+                            )
+
+
 
                     dispositivos[websocket] = {
+
+
                         "role": "client",
+
+
                         "name": nombre,
-                        "screen_width": datos.get("screen_width", 1920),
-                        "screen_height": datos.get("screen_height", 1080),
+
+
+                        "screen_width":
+                            datos.get(
+                                "screen_width",
+                                1920
+                            ),
+
+
+                        "screen_height":
+                            datos.get(
+                                "screen_height",
+                                1080
+                            ),
+
                     }
 
-                    print("CLIENTE:", nombre)
+
+
+                    print(
+                        "CLIENTE:",
+                        nombre
+                    )
+
+
+
 
                 # ------------------------------
                 # VIEWER
                 # ------------------------------
 
+
                 elif role == "viewer":
 
-                    dispositivos[websocket] = {"role": "viewer"}
 
-                    print("VIEWER conectado")
+                    dispositivos[websocket] = {
+
+
+                        "role": "viewer"
+
+                    }
+
+
+                    print(
+                        "VIEWER conectado"
+                    )
+
+
 
             # ==================================================
             # LISTA DISPOSITIVOS
             # ==================================================
 
+
             elif tipo == "list_devices":
+
 
                 lista = []
 
+
+
                 for ws, dispositivo in dispositivos.items():
+
 
                     if dispositivo.get("role") == "client":
 
+
                         lista.append(
-                            {"name": dispositivo.get("name"), "status": "online"}
+
+
+                            {
+
+                                "name":
+                                    dispositivo.get(
+                                        "name"
+                                    ),
+
+
+                                "status":
+                                    "online"
+
+                            }
+
+
                         )
 
-                await enviar_json(websocket, {"type": "device_list", "devices": lista})
+
+
+                await enviar_json(
+                    websocket,
+                    {
+                        "type":
+                            "device_list",
+
+                        "devices":
+                            lista
+                    }
+                )
+
+
 
             # ==================================================
             # SELECCIONAR PC
             # ==================================================
 
+
             elif tipo == "select_device":
+
 
                 nombre = datos.get("name")
 
-                info = dispositivos.get(websocket)
+
+
+                info = dispositivos.get(
+                    websocket
+                )
+
+
 
                 if info and info.get("role") == "viewer":
 
-                    anterior = selecciones.get(websocket)
+
+
+                    anterior = selecciones.get(
+                        websocket
+                    )
+
+
 
                     if anterior and anterior != nombre:
 
-                        await enviar_a_pc(anterior, json.dumps({"type": "stream_stop"}))
+
+                        await enviar_a_pc(
+                            anterior,
+                            json.dumps(
+                                {
+                                    "type":
+                                        "stream_stop"
+                                }
+                            )
+                        )
+
+
 
                     selecciones[websocket] = nombre
 
-                    print("PC seleccionada:", nombre)
 
-                    await enviar_a_pc(nombre, json.dumps({"type": "stream_start"}))
+
+                    print(
+                        "PC seleccionada:",
+                        nombre
+                    )
+
+
+
+                    await enviar_a_pc(
+                        nombre,
+                        json.dumps(
+                            {
+                                "type":
+                                    "stream_start"
+                            }
+                        )
+                    )
+
+
 
                     if nombre in camera_lists:
 
+
+
                         await enviar_json(
+
                             websocket,
-                            {"type": "camera_list", "cameras": camera_lists[nombre]},
+
+                            {
+
+                                "type":
+                                    "camera_list",
+
+                                "cameras":
+                                    camera_lists[nombre]
+
+                            }
+
                         )
+
+
 
             # ==================================================
             # CAMARAS
             # ==================================================
 
+
             elif tipo == "camera_list":
 
-                nombre = datos.get("device")
 
-                cams = datos.get("cameras", [])
+
+                nombre = datos.get(
+                    "device"
+                )
+
+
+
+                cams = datos.get(
+                    "cameras",
+                    []
+                )
+
+
 
                 camera_lists[nombre] = cams
 
+
+
                 for viewer, pc in list(selecciones.items()):
+
+
 
                     if pc == nombre:
 
+
                         await enviar_json(
-                            viewer, {"type": "camera_list", "cameras": cams}
+
+                            viewer,
+
+                            {
+
+                                "type":
+                                    "camera_list",
+
+                                "cameras":
+                                    cams
+
+                            }
+
                         )
+
+
 
             elif tipo == "set_camera":
 
-                pc = selecciones.get(websocket)
+
+
+                pc = selecciones.get(
+                    websocket
+                )
+
+
 
                 if pc:
 
+
+
                     await enviar_a_pc(
+
                         pc,
+
                         json.dumps(
-                            {"type": "set_camera", "camera": datos.get("camera")}
-                        ),
+
+                            {
+
+                                "type":
+                                    "set_camera",
+
+                                "camera":
+                                    datos.get(
+                                        "camera"
+                                    )
+
+                            }
+
+                        )
+
                     )
-                    # ==================================================
+                                # ==================================================
             # CONTROL REMOTO
             # ==================================================
 
+
             elif tipo in (
+
                 "mouse_move",
+
                 "mouse_click",
+
                 "mouse_double_click",
+
                 "mouse_scroll",
+
                 "key_press",
+
             ):
 
-                info_viewer = dispositivos.get(websocket)
+
+                info_viewer = dispositivos.get(
+                    websocket
+                )
+
+
 
                 if not info_viewer:
 
                     continue
 
+
+
                 if info_viewer.get("role") != "viewer":
 
                     continue
 
-                pc = selecciones.get(websocket)
+
+
+                pc = selecciones.get(
+                    websocket
+                )
+
+
 
                 if not pc:
 
                     continue
 
+
+
                 comando = datos.copy()
+
+
 
                 if tipo == "mouse_move":
 
+
+
                     info_pc = None
+
+
 
                     for ws, info in dispositivos.items():
 
-                        if info.get("role") == "client" and info.get("name") == pc:
+
+
+                        if (
+                            info.get("role") == "client"
+                            and info.get("name") == pc
+                        ):
+
 
                             info_pc = info
 
                             break
 
+
+
                     if info_pc:
 
-                        ancho_pc = info_pc.get("screen_width", 1920)
 
-                        alto_pc = info_pc.get("screen_height", 1080)
+
+                        ancho = info_pc.get(
+                            "screen_width",
+                            1920
+                        )
+
+
+                        alto = info_pc.get(
+                            "screen_height",
+                            1080
+                        )
+
+
 
                         try:
 
-                            x_rel = float(datos.get("x", 0))
 
-                            y_rel = float(datos.get("y", 0))
+                            x = float(
+                                datos.get(
+                                    "x",
+                                    0
+                                )
+                            )
+
+
+                            y = float(
+                                datos.get(
+                                    "y",
+                                    0
+                                )
+                            )
+
 
                         except:
 
+
                             continue
 
-                        x_rel = max(0.0, min(1.0, x_rel))
 
-                        y_rel = max(0.0, min(1.0, y_rel))
 
-                        comando["x"] = int(x_rel * ancho_pc)
+                        x = max(
+                            0.0,
+                            min(
+                                1.0,
+                                x
+                            )
+                        )
 
-                        comando["y"] = int(y_rel * alto_pc)
 
-                await enviar_a_pc(pc, json.dumps(comando))
+                        y = max(
+                            0.0,
+                            min(
+                                1.0,
+                                y
+                            )
+                        )
 
+
+
+                        comando["x"] = int(
+                            x * ancho
+                        )
+
+
+                        comando["y"] = int(
+                            y * alto
+                        )
+
+
+
+                await enviar_a_pc(
+
+                    pc,
+
+                    json.dumps(
+                        comando
+                    )
+
+                )
+
+
+
+                        # ==================================================
+            # EXPLORADOR ARCHIVOS
             # ==================================================
-            # ARCHIVOS
-            # ==================================================
 
-            elif tipo == "list_files":
 
-                pc = selecciones.get(websocket)
+            elif tipo in (
+                "list_files",
+                "explore_folder",
+                "list_drives"
+            ):
+
+
+
+                pc = selecciones.get(
+                    websocket
+                )
+
+
 
                 if not pc:
 
                     continue
 
-                ruta = datos.get("path", "C:\\")
 
-                await enviar_a_pc(pc, json.dumps({"type": "list_files", "path": ruta}))
 
-            # respuesta del cliente con lista archivos
+
+                if tipo == "list_drives":
+
+
+                    await enviar_a_pc(
+
+                        pc,
+
+                        json.dumps(
+
+                            {
+
+                                "type":
+                                    "list_drives"
+
+                            }
+
+                        )
+
+                    )
+
+
+
+
+                else:
+
+
+                    ruta = datos.get(
+                        "path",
+                        "C:\\"
+                    )
+
+
+
+                    await enviar_a_pc(
+
+                        pc,
+
+                        json.dumps(
+
+                            {
+
+                                "type":
+                                    "explore_folder",
+
+                                "path":
+                                    ruta
+
+                            }
+
+                        )
+
+                    )
+
+
+
+            # ==================================================
+            # NUEVO FIX
+            # SOLICITUD DESCARGA ARCHIVO
+            # ==================================================
+
+
+            elif tipo == "download_file":
+
+
+
+                pc = selecciones.get(
+                    websocket
+                )
+
+
+
+                if not pc:
+
+                    continue
+
+
+
+                ruta = datos.get(
+                    "path"
+                )
+
+
+
+                if ruta:
+
+
+
+                    await enviar_a_pc(
+
+                        pc,
+
+                        json.dumps(
+
+                            {
+
+                                "type":
+                                    "download_file",
+
+                                "path":
+                                    ruta
+
+                            }
+
+                        )
+
+                    )
+
+
+
+            # ==================================================
+            # RESPUESTA LISTA ARCHIVOS
+            # ==================================================
+
 
             elif tipo == "file_list":
 
-                nombre = None
 
-                info = dispositivos.get(websocket)
+
+                info = dispositivos.get(
+                    websocket
+                )
+
+
 
                 if info:
 
-                    nombre = info.get("name")
 
-                if nombre:
 
-                    await enviar_a_viewer_de_pc(
-                        nombre,
-                        json.dumps(
-                            {
-                                "type": "file_list",
-                                "path": datos.get("path", ""),
-                                "items": datos.get("items", []),
-                            }
-                        ),
+                    nombre = info.get(
+                        "name"
                     )
 
-            # error archivos
+
+
+                    viewer = obtener_viewer_de_pc(
+                        nombre
+                    )
+
+
+
+                    if viewer:
+
+
+
+                        await enviar_a_viewer(
+
+                            viewer,
+
+                            json.dumps(
+
+                                {
+
+                                    "type":
+                                        "file_list",
+
+                                    "path":
+                                        datos.get(
+                                            "path",
+                                            ""
+                                        ),
+
+                                    "items":
+                                        datos.get(
+                                            "items",
+                                            []
+                                        )
+
+                                }
+
+                            )
+
+                        )
+
+
+                        # ==================================================
+            # TRANSFERENCIA ARCHIVOS JSON
+            # ==================================================
+
+
+            elif tipo in (
+                "FILE_START",
+                "FILE_END"
+            ):
+
+
+
+                info = dispositivos.get(
+                    websocket
+                )
+
+
+
+                if info:
+
+
+                    nombre = info.get(
+                        "name"
+                    )
+
+
+
+                    viewer = obtener_viewer_de_pc(
+                        nombre
+                    )
+
+
+
+                    if viewer:
+
+
+                        await enviar_a_viewer(
+
+                            viewer,
+
+                            json.dumps(
+                                datos
+                            )
+
+                        )
+                        
+            # ==================================================
+            # ERROR ARCHIVOS
+            # ==================================================
+
 
             elif tipo == "file_error":
 
-                nombre = None
 
-                info = dispositivos.get(websocket)
+
+                info = dispositivos.get(
+                    websocket
+                )
+
+
 
                 if info:
 
-                    nombre = info.get("name")
 
-                if nombre:
 
-                    await enviar_a_viewer_de_pc(
-                        nombre,
-                        json.dumps(
-                            {
-                                "type": "file_error",
-                                "message": datos.get("message", "Error desconocido"),
-                            }
-                        ),
+                    nombre = info.get(
+                        "name"
                     )
+
+
+
+                    viewer = obtener_viewer_de_pc(
+                        nombre
+                    )
+
+
+
+                    if viewer:
+
+
+
+                        await enviar_a_viewer(
+
+                            viewer,
+
+                            json.dumps(
+
+                                {
+
+                                    "type":
+                                        "file_error",
+
+                                    "message":
+                                        datos.get(
+                                            "message",
+                                            "Error desconocido"
+                                        )
+
+                                }
+
+                            )
+
+                        )
+
+
 
     except websockets.ConnectionClosed:
 
+
         pass
+
+
 
     except Exception as error:
 
-        print("[!] Error con cliente:", error)
+
+        print(
+            "[!] Error con cliente:",
+            error
+        )
+
+
 
     # ==================================================
-    # LIMPIEZA DESCONEXION
+    # LIMPIEZA
     # ==================================================
 
-    pc_seleccionada = selecciones.pop(websocket, None)
+
+    pc_seleccionada = selecciones.pop(
+        websocket,
+        None
+    )
+
+
 
     if pc_seleccionada:
 
-        await enviar_a_pc(pc_seleccionada, json.dumps({"type": "stream_stop"}))
 
-    info = dispositivos.pop(websocket, None)
+
+        await enviar_a_pc(
+
+            pc_seleccionada,
+
+            json.dumps(
+
+                {
+
+                    "type":
+                        "stream_stop"
+
+                }
+
+            )
+
+        )
+
+
+
+    info = dispositivos.pop(
+        websocket,
+        None
+    )
+
+
 
     if info:
 
-        nombre = info.get("name")
+
+
+        nombre = info.get(
+            "name"
+        )
+
+
 
         if nombre:
 
-            camera_lists.pop(nombre, None)
 
-    print("[-] Desconectado")
+            camera_lists.pop(
+                nombre,
+                None
+            )
+
+
+
+    print(
+        "[-] Desconectado"
+    )
+
 
 
 # ======================================================
@@ -479,16 +1143,44 @@ async def manejar_cliente(websocket):
 
 async def main():
 
-    port = int(os.environ.get("PORT", 8765))
 
-    print("SERVIDOR REMOTEVIEW INICIADO", port)
+    port = int(
+        os.environ.get(
+            "PORT",
+            8765
+        )
+    )
 
-    async with websockets.serve(manejar_cliente, "0.0.0.0", port, max_size=None):
+
+
+    print(
+        "SERVIDOR REMOTEVIEW INICIADO",
+        port
+    )
+
+
+
+    async with websockets.serve(
+
+        manejar_cliente,
+
+        "0.0.0.0",
+
+        port,
+
+        max_size=None
+
+    ):
+
 
         await asyncio.Future()
 
 
-print("========== ANTES DE ARRANCAR WEBSOCKET ==========")
+
+print(
+    "========== ANTES DE ARRANCAR WEBSOCKET =========="
+)
+
 
 
 asyncio.run(main())
